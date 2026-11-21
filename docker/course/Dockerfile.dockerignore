@@ -1,0 +1,25 @@
+**
+!source/
+!source/**
+!run/
+!run/**
+!scripts/
+!scripts/**
+!tools/
+!tools/**
+!flight_ws/
+!flight_ws/src/
+!flight_ws/src/**
+!deliverable/
+!deliverable/report_manifest.json
+!docker/
+!docker/course/
+!docker/course/**
+**/__pycache__/
+**/*.pyc
+**/logs/
+**/outputs/
+**/dataset*/
+**/runs/
+!run/vbdf/detection/drone_detect_yolov5/utils/loggers/wandb/**
+To Be Reviewed/

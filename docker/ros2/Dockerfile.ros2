@@ -1,0 +1,101 @@
+# ============================================================
+# ROS 2 Jazzy — extends isaac-lab-base (Ubuntu 24.04 / noble)
+#
+# Adds only:
+#   - ROS 2 Jazzy desktop (apt)
+#   - CycloneDDS RMW
+#   - colcon / rosdep / vcstool (via ros-dev-tools)
+#
+# Build:
+#   docker compose -f docker-compose.yaml build ros2
+# ============================================================
+
+ARG BASE_IMAGE=isaac-lab-base
+FROM ${BASE_IMAGE}
+
+SHELL ["/bin/bash", "-c"]
+ENV DEBIAN_FRONTEND=noninteractive
+
+# IsaacLab 3.0's base image ends as a non-root user; switch to root for the apt/keyring
+# setup below (and to write /root/.bashrc). The image stays root, matching rpg's workflow.
+USER root
+
+# ── ROS 2 Jazzy apt repository ──────────────────────────────
+# wget is already in isaac-lab-base; ros.key is a binary GPG keyring
+# (no gnupg2 dearmor step needed).
+RUN wget -qO /usr/share/keyrings/ros-archive-keyring.gpg \
+        https://raw.githubusercontent.com/ros/rosdistro/master/ros.key && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
+http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) main" \
+        > /etc/apt/sources.list.d/ros2.list
+
+# ── ROS 2 Jazzy desktop + CycloneDDS + dev tools ────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ros-jazzy-desktop \
+        ros-jazzy-rmw-cyclonedds-cpp \
+        ros-dev-tools \
+        python3-pip && \
+    # Picks up any ros_ws declared in an Isaac Lab extension.toml.
+    ${ISAACLAB_PATH}/isaaclab.sh -p ${ISAACLAB_PATH}/tools/install_deps.py \
+        rosdep ${ISAACLAB_PATH}/source --ros_distro jazzy && \
+    apt-get autoremove -y && apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# rclpy (built for the system Python 3.12) is ABI-compatible with Isaac Sim's embedded
+# Python 3.12, but its pure-python deps are installed into the system site-packages by
+# apt. Add them to Isaac Sim's interpreter so `python -c "import rclpy"` works after
+# sourcing ROS 2 — no separate system interpreter needed.
+RUN /isaac-sim/kit/python/bin/python3 -m pip install --no-cache-dir PyYAML lark
+# VBDF flightpilot nodes: flightpy checkpoints pickle ruamel objects, and the
+# flightpy stable-baselines3 fork (put on PYTHONPATH by the launch files) needs pandas.
+RUN /isaac-sim/kit/python/bin/python3 -m pip install --no-cache-dir ruamel.yaml pandas
+# flightplot (flight_ws/src/flight/flightmare/flightplot): the course's streamlit rollout viewer.
+# The credentials file suppresses streamlit's first-run email prompt.
+RUN /isaac-sim/kit/python/bin/python3 -m pip install --no-cache-dir streamlit plotly ipywidgets && \
+    mkdir -p /root/.streamlit && printf '[general]\nemail = ""\n' > /root/.streamlit/credentials.toml
+# VBDF Task 1: the vendored YOLOv5 fork (run/vbdf/detection/drone_detect_yolov5).
+RUN /isaac-sim/kit/python/bin/python3 -m pip install --no-cache-dir seaborn thop ultralytics
+
+# OvPhysX kit-less PhysX backend (optional runtime wheel from NVIDIA's index).
+RUN ${ISAACLAB_PATH}/isaaclab.sh -p -m pip install --no-cache-dir \
+    --extra-index-url https://pypi.nvidia.com \
+    -e "${ISAACLAB_PATH}/source/isaaclab_ovphysx[ovphysx]"
+
+# ── Interactive shell tools ─────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends tmux && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ── Serial device access ────────────────────────────────────
+# The image runs as root, which can already open /dev/ttyUSB* (mode 0660,
+# root:dialout). These groups exist for the base image's non-root accounts, so
+# `./run.sh shell ubuntu` can talk to a serial radio too. The GIDs match a stock
+# Ubuntu host (dialout=20, tty=5); on a host that renumbers them, bind-mounted
+# device nodes carry the host GID and the membership below will not match.
+RUN groupadd -f -g 20 dialout && groupadd -f -g 5 tty && \
+    for u in root ubuntu isaaclab; do \
+        id "$u" &>/dev/null && usermod -aG tty,dialout "$u"; \
+    done; true
+
+# ── CycloneDDS config ───────────────────────────────────────
+COPY cyclonedds.xml /etc/cyclonedds.xml
+
+ENV ROS_DISTRO=jazzy \
+    RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+    CYCLONEDDS_URI=/etc/cyclonedds.xml \
+    COLCON_WS=/workspace/flight_ws \
+    RPG_ISAAC_PATH=/workspace/isaaclab/source/rpg_isaac \
+    PIP_BREAK_SYSTEM_PACKAGES=1
+
+# Shell ergonomics: source ROS 2, auto-source the colcon workspace, cd aliases.
+# Isaac Sim 6.0 embeds Python 3.12 — the same version ROS 2 Jazzy uses — so the
+# isaac-lab-base `python`/`pip` (Isaac Sim's interpreter) can import rclpy directly
+# once ROS 2 is sourced (setup.bash adds /opt/ros/jazzy/lib/python3.12/site-packages
+# to PYTHONPATH). No separate system interpreter needed.
+RUN { \
+    echo 'source /opt/ros/jazzy/setup.bash'; \
+    echo '[ -f ${COLCON_WS}/install/setup.bash ] && source ${COLCON_WS}/install/setup.bash'; \
+    echo 'alias cw="cd ${COLCON_WS}"'; \
+    echo 'alias cr="cd ${RPG_ISAAC_PATH}"'; \
+    } >> /root/.bashrc
+
+WORKDIR ${ISAACLAB_PATH}

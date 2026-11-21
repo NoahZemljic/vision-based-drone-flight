@@ -1,0 +1,20 @@
+# GPU overlay, layered on by run.sh when RPG_GPU resolves to gpu. Additive because a
+# compose override can add to reservations.devices but cannot clear it; nvoptix.bin
+# ships with the driver, so its bind mount fails on a host without one.
+
+services:
+  flight:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, graphics, utility, compute]
+
+    volumes:
+      # OptiX denoiser weights; RTX denoising segfaults without them.
+      - type: bind
+        source: /usr/share/nvidia/nvoptix.bin
+        target: /usr/share/nvidia/nvoptix.bin
+        read_only: true

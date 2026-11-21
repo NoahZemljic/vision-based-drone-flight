@@ -1,0 +1,11 @@
+services:
+  course:
+    environment:
+      LIBGL_ALWAYS_SOFTWARE: "0"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

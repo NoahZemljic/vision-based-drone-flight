@@ -1,0 +1,29 @@
+seed: 123
+n_steps: 100
+n_epochs: 10
+gamma: 0.98
+gae_lambda: 0.95
+clip_range: !!python/name:stable_baselines3.common.utils.func ''
+ent_coef: 0.002
+vf_coef: 0.5
+max_grad_norm: 0.5
+use_sde: false
+sde_sample_freq: 1
+learning_rate: !!python/object:stable_baselines3.common.utils.LinearSchedule
+  start: 0.006
+  end: 2.0e-05
+  end_fraction: 1.0
+policy_kwargs:
+  activation_fn: !!python/name:torch.nn.modules.activation.ReLU ''
+  net_arch:
+    pi:
+    - 256
+    - 256
+    vf:
+    - 256
+    - 256
+  log_std_init: -0.5
+normalize_input: true
+normalize_value: false
+clip_obs: 100.0
+batch_size: 12800

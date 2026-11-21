@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CycloneDDS configuration for Jetson Orin NX containers.
+
+  Enables iceoryx shared-memory transport for zero-copy intra-host
+  communication (e.g. between ROS2 nodes on the same Jetson).
+
+  Requirements (in docker-compose.yaml):
+    ipc: host          — share IPC namespace so /dev/shm is visible across containers
+    shm_size: "1gb"    — default Docker /dev/shm (64MB) is too small for sensor data
+
+  CYCLONEDDS_URI must point to this file:
+    ENV CYCLONEDDS_URI=/etc/cyclonedds.xml
+-->
+<CycloneDDS
+    xmlns="https://cdds.io/config"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://cdds.io/config https://raw.githubusercontent.com/eclipse-cyclonedds/cyclonedds/master/etc/cyclonedds.xsd">
+  <Domain>
+    <!-- Large-message tuning per
+         https://docs.stereolabs.com/docs/integrations/ros-2/dds-and-network-tuning
+         so a second reliable subscriber on /hil/image (e.g. rosbag2) does not
+         stall the renderer's publish(). Requires net.core.rmem_max raised on
+         the host (host netns) or SocketReceiveBufferSize min cannot be met. -->
+    <General>
+      <MaxMessageSize>65500B</MaxMessageSize>
+    </General>
+    <Internal>
+      <!-- Default 208 KiB holds ~1.4 of our 147 KiB image frames; one reader
+           hiccup overflows it and reliable retransmits throttle the writer.
+           max= (not min=) so an untuned host degrades gracefully: nodes run
+           with kernel-default buffers instead of failing to create the
+           domain; the HIL image pipeline is the only consumer that needs the
+           full 10MB (raise net.core.rmem_max, see HOST_SETUP.md). -->
+      <SocketReceiveBufferSize max="10MB"/>
+      <!-- Send side is just as critical for images: dds_write transmits
+           synchronously, and a full 208 KiB SNDBUF makes sendmsg() block
+           while rclpy holds the GIL, freezing the whole publishing process
+           (profiled: ~2 ms mean, 20-140 ms tail per publish behind 150 KiB
+           image bursts). net.core.wmem_max gates the granted size. -->
+      <SocketSendBufferSize max="10MB"/>
+      <Watermarks>
+        <WhcHigh>500kB</WhcHigh>
+      </Watermarks>
+    </Internal>
+    <SharedMemory>
+      <!-- Disable iceoryx shared-memory transport (requires RouDi daemon) -->
+      <!-- Set to true and start iox-roudi if zero-copy IPC is needed -->
+      <Enable>false</Enable>
+      <LogLevel>info</LogLevel>
+    </SharedMemory>
+  </Domain>
+</CycloneDDS>

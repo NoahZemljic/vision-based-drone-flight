@@ -1,0 +1,39 @@
+# Large-scale recipe (4096 envs, tuned 2026-08-20): trains hover in ~4 min and
+# tracking in ~14 min on one GPU, matching the original flightpy results with
+# smoother omega. The flightpy-parity settings (100 envs x 250 steps = one
+# 25000-sample minibatch, lr 3e-4 -> 1e-5, ent_coef 0.001, 1e8 steps) remain
+# reproducible via CLI overrides. Policy is unchanged from flightpy:
+# MlpPolicy [256,256] ReLU, tanh on the mean, log_std_init -0.5, obs
+# running-mean/std normalisation.
+seed: 123
+n_timesteps: 200_000_000
+policy: TanhMlpPolicy
+
+n_steps: 100
+freeze_std_iters: 0
+n_minibatches: 4
+n_epochs: 10
+gamma: 0.98
+gae_lambda: 0.95
+clip_range: 0.2
+ent_coef: 0.002
+vf_coef: 0.5
+max_grad_norm: 0.5
+use_sde: false
+sde_sample_freq: 1
+
+learning_rate:
+  start: 6.0e-3
+  end: 2.0e-5
+  end_fraction: 1.0
+
+policy_kwargs:
+  activation_fn: nn.ReLU
+  net_arch:
+    pi: [256, 256]
+    vf: [256, 256]
+  log_std_init: -0.5
+
+normalize_input: true
+normalize_value: false
+clip_obs: 100.0

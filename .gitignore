@@ -1,0 +1,42 @@
+# Local environments, caches and build products
+.vscode/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.DS_Store
+
+# New experiment output; curated deliverable artifacts remain tracked
+outputs/
+/deliverable/eval_fleet/**/*.csv
+logs/
+wandb/
+!run/vbdf/detection/drone_detect_yolov5/utils/loggers/wandb/
+!run/vbdf/detection/drone_detect_yolov5/utils/loggers/wandb/**
+*.log
+**/tests/output/
+run/*/output/
+run/*/imgui.ini
+
+# Credentials and local configuration
+.env
+.wandb_api_key
+docker/.env
+docker/.container.cfg
+docker/ros2/wandb.env
+docker/ros2/container_home/
+docker/ros2/.export/
+flight_ws/install/
+flight_ws/log/
+flight_ws/rosbags/
+run/vbdf/detection/dataset*/
+run/vbdf/detection/runs/
+
+# Course assets/binaries are supplied by the matching external image
+source/rpg_isaac/rpg_assets/meshes/
+source/rpg_isaac/rpg_simulator/kernels/_bin/
+
+# Review locally; omit from the clean repository upload
+/To Be Reviewed/

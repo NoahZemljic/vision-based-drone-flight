@@ -1,0 +1,3 @@
+# Offline analysis only. Simulation dependencies come from the matching course image.
+numpy==2.5.5
+matplotlib==3.11.2

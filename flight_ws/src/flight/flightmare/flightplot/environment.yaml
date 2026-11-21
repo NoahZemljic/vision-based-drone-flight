@@ -1,0 +1,16 @@
+name: streamlit
+channels:
+  - conda-forge
+dependencies:
+  - python==3.12
+  - streamlit
+  - ca-certificates
+  - openssl
+  - rosbags
+  - certifi
+  - numpy
+  - scipy
+  - pandas
+  - matplotlib
+  - pyyaml
+prefix: /home/bfd/Software/mambaforge-pypy3/envs/streamlit

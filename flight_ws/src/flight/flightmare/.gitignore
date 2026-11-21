@@ -1,0 +1,62 @@
+# Python
+dist
+*.egg-info
+*.so
+__pycache__
+*.bag
+*.mp4
+flightpy/build/
+# Ignore cmake build artifacts in flightlib/build but keep setup.py (needed
+# for `pip install -e .` after a fresh cmake build of flightgym).
+flightlib/build/*
+!flightlib/build/setup.py
+*.cache
+tags
+
+
+# Gitignore
+
+# VScode
+.vscode/
+.vscode/*
+**/.vscode/*
+!.vscode/extensions.json
+
+# General
+_build/
+.sass-cache
+_posts
+_site
+
+saved*
+saveckpts
+ablation
+libtorch_cpu
+
+*.out
+
+data
+PPO*
+*.csv
+
+# VIM
+*.swp
+*.vim
+*.swo
+tags
+
+# Wandb
+wandb
+
+# Pycharm
+.idea/
+
+results/
+datasets/
+pretrained_models/
+
+compile_commands.json
+
+/flightpilot/real_world_policies/*
+/flightpy/temp/*
+/flightrender/temp/*

@@ -1,0 +1,111 @@
+# ============================================================
+# rpg_isaac flight — Docker Compose (PC)
+#
+# Build chain (defaults shown; ``run.sh --suffix NAME`` derives both names):
+#   isaac-lab-base-v30 (built by IsaacLab's docker/container.py)
+#   rpg_isaac:ros2-v30 (Dockerfile.ros2) — ROS 2 Jazzy + CycloneDDS
+#
+# ``run.sh`` supplies the release-specific Compose project name. This scopes
+# the named cache volumes, so this stack can run beside the IsaacLab 2.3 one.
+# ============================================================
+
+x-common-env: &common-env
+  QT_X11_NO_MITSHM: "1"
+  # Keep the two shipped IsaacLab stacks on separate DDS domains by default.
+  # Override this explicitly when they should communicate over ROS 2.
+  ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-30}
+  NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+  NVIDIA_DRIVER_CAPABILITIES: all
+  ACCEPT_EULA: "Y"
+  PRIVACY_CONSENT: "Y"
+  # Omniverse Hub asset-cache daemon cannot start as the container user, which
+  # stalls omni.client ~10s at startup and spams warnings; not needed for
+  # local assets.
+  OMNICLIENT_HUB_MODE: disabled
+
+services:
+  # -- Build-only targets (no run) ---------------------------
+  ros2:
+    image: ${FLIGHT_IMAGE:-rpg_isaac:ros2-v30}
+    build:
+      context: .
+      dockerfile: Dockerfile.ros2
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-isaac-lab-base-v30}
+    profiles: ["build"]
+
+  # -- Main service ------------------------------------------
+  flight:
+    image: ${FLIGHT_IMAGE:-rpg_isaac:ros2-v30}
+    container_name: ${PROJECT:-rpg-isaac-v30}_ros2
+    hostname: ${CONTAINER_HOSTNAME:-rpg-isaac-v30}
+    stdin_open: true
+    tty: true
+    entrypoint: bash
+    network_mode: host
+    privileged: true
+    ipc: host
+    shm_size: "1gb"
+
+    # CPU-only on its own; the NVIDIA reservation is in docker-compose.gpu.yaml.
+
+    # W&B credentials for training telemetry: cp wandb.env.example wandb.env
+    # and paste your key (gitignored; absent file is fine).
+    env_file:
+      - path: ./wandb.env
+        required: false
+
+    environment:
+      <<: *common-env
+      DISPLAY: ${RPG_X11_DISPLAY-${DISPLAY:-:0}}
+      # run.sh generates a universal-family cookie for the active host display.
+      XAUTHORITY: /tmp/rpg-isaac.xauth
+
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${RPG_X11_AUTHORITY:-${XAUTHORITY:-${HOME}/.Xauthority}}:/tmp/rpg-isaac.xauth:ro
+      # Host timezone, so run-dir names / wandb stamps match local time
+      # (isaac-lab-base mounts this too; without it the container is UTC).
+      - /etc/localtime:/etc/localtime:ro
+
+      # Serial radios / flight controllers (/dev/ttyUSB*, /dev/ttyACM*).
+      # ``privileged: true`` alone only grants the device cgroup permission — the
+      # container still gets its own /dev tmpfs, populated once at creation, so
+      # anything plugged in (or re-plugged) afterwards never appears. Binding the
+      # host /dev makes hot-plugged serial adapters show up live.
+      - /dev:/dev
+
+      # ── Isaac Sim persistent caches (ported from IsaacLab base compose) ──
+      # Without these, Isaac Sim recompiles shaders / re-downloads assets every launch.
+      - isaac-cache-kit:/isaac-sim/kit/cache
+      - isaac-cache-ov:/root/.cache/ov
+      - isaac-cache-pip:/root/.cache/pip
+      - isaac-cache-gl:/root/.cache/nvidia/GLCache
+      - isaac-cache-compute:/root/.nv/ComputeCache
+      - isaac-logs:/root/.nvidia-omniverse/logs
+      - isaac-carb-logs:/isaac-sim/kit/logs/Kit/Isaac-Sim
+      - isaac-data:/root/.local/share/ov/data
+
+      # NGX (DLSS) is injected by the container toolkit itself with
+      # NVIDIA_DRIVER_CAPABILITIES=all; a manual libnvidia-ngx.so.1 bind mount
+      # (an old workaround) collides with the toolkit's create-symlinks hook on
+      # recent toolkits ("device or resource busy" at container create).
+
+      # Live-mount the IsaacLab source over the baked copy (mirrors the
+      # isaac-lab-base dev container). The checkout must stay on the same
+      # IsaacLab line the image was built from (pip deps are baked).
+      - ${ISAACLAB_HOST_PATH}/source:/workspace/isaaclab/source:rw
+      # Live-mount rpg_isaac over the baked copy (Isaac side, nested).
+      - ${RPG_ISAAC_HOST_PATH}:/workspace/isaaclab/source/rpg_isaac:rw
+      # Bring flight_ws out to a top-level colcon workspace (ROS side).
+      - ${RPG_ISAAC_HOST_PATH}/flight_ws:/workspace/flight_ws:rw
+
+volumes:
+  isaac-cache-kit:
+  isaac-cache-ov:
+  isaac-cache-pip:
+  isaac-cache-gl:
+  isaac-cache-compute:
+  isaac-logs:
+  isaac-carb-logs:
+  isaac-data:

@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>drone_detect_deployment</name>
+  <version>0.0.1</version>
+  <description>ROS 2 YOLOv5 detector node for the VBDF course (port of the ROS 1 drone_detect_yolov5_deployment / yolov5_ros wrapper)</description>
+
+  <maintainer email="song@ifi.uzh.ch">Yunlong Song</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>detection_msgs</depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
